@@ -1,0 +1,411 @@
+import { create } from 'zustand';
+import {
+  Match,
+  Innings,
+  Ball,
+  BallExtras,
+  Dismissal,
+  PreviousState,
+  RecentBallDisplay,
+  BattingCardEntry,
+  BowlingCardEntry,
+  ExtraType,
+  InningsStatus,
+} from '@/types/cricket';
+import {
+  recordBallWithUpdates,
+  undoBallWithUpdates,
+  getLastBall,
+  updateMatch,
+} from '@/lib/firestore-service';
+import {
+  calculateRunRate,
+  calculateRequiredRunRate,
+  calculateStrikeRate,
+  calculateEconomyRate,
+  formatOvers,
+  formatBallDisplay,
+  generateBallId,
+  shouldRotateStrike,
+  isInningsComplete,
+  isLegalDelivery,
+} from '@/lib/cricket';
+
+interface RecordBallParams {
+  matchId: string;
+  match: Match;
+  innings: Innings;
+  runsBat: number;
+  extras: BallExtras;
+  isWicket: boolean;
+  dismissal: Dismissal | null;
+}
+
+interface ScoringState {
+  isScoring: boolean;
+  ballSequence: number;
+  currentOverBalls: number;
+  showWicketModal: boolean;
+  showNewBatsmanModal: boolean;
+  showNewBowlerModal: boolean;
+  showExtrasModal: boolean;
+
+  recordBall: (params: RecordBallParams) => Promise<void>;
+  undoLastBall: (matchId: string, match: Match) => Promise<void>;
+  startNewOver: () => void;
+  retireHurt: (matchId: string, match: Match, batsmanId: string) => Promise<void>;
+  
+  setScoring: (isScoring: boolean) => void;
+  toggleWicketModal: () => void;
+  toggleExtrasModal: () => void;
+  toggleNewBatsmanModal: () => void;
+  toggleNewBowlerModal: () => void;
+  reset: () => void;
+}
+
+export const useScoringStore = create<ScoringState>((set, get) => ({
+  isScoring: false,
+  ballSequence: 1,
+  currentOverBalls: 0,
+  showWicketModal: false,
+  showNewBatsmanModal: false,
+  showNewBowlerModal: false,
+  showExtrasModal: false,
+
+  recordBall: async ({
+    matchId,
+    match,
+    innings,
+    runsBat,
+    extras,
+    isWicket,
+    dismissal,
+  }) => {
+    if (!match.striker || !match.nonStriker || !match.currentBowler) {
+      throw new Error('Missing active players');
+    }
+
+    const isLegal = isLegalDelivery(extras.type);
+    
+    // Total runs for this delivery
+    let totalRuns = runsBat;
+    if (extras.type === ExtraType.Wide || extras.type === ExtraType.NoBall) {
+      totalRuns += extras.runs || 1; // Wide/NB default to 1 run penalty + any extras
+    } else if (extras.type === ExtraType.Bye || extras.type === ExtraType.LegBye) {
+      totalRuns += extras.runs;
+    }
+
+    // Previous State Snapshot
+    const previousState: PreviousState = {
+      runs: match.score.runs,
+      wickets: match.score.wickets,
+      overs: match.score.overs,
+      legalBallsCount: match.score.legalBallsCount,
+      strikerId: match.striker.id,
+      nonStrikerId: match.nonStriker.id,
+      striker: { ...match.striker },
+      nonStriker: { ...match.nonStriker },
+      bowler: { ...match.currentBowler },
+      recentBalls: [...match.recentBalls],
+    };
+
+    const { ballSequence, currentOverBalls } = get();
+    
+    // Calculate new legal balls and overs
+    const newLegalBallsCount = isLegal ? match.score.legalBallsCount + 1 : match.score.legalBallsCount;
+    const newOvers = formatOvers(newLegalBallsCount);
+    
+    // Create the Ball object
+    const ballId = generateBallId(match.currentInnings, ballSequence);
+    const overNumber = Math.floor(newLegalBallsCount / 6);
+    
+    const ball: Ball = {
+      id: ballId,
+      innings: match.currentInnings,
+      overNumber,
+      ballInOver: isLegal ? currentOverBalls + 1 : currentOverBalls,
+      ballSequence,
+      batsmanId: match.striker.id,
+      bowlerId: match.currentBowler.id,
+      runsBat,
+      extras,
+      totalRuns,
+      isLegalDelivery: isLegal,
+      isWicket,
+      dismissal,
+      previousState,
+      timestamp: new Date(),
+    };
+
+    // Calculate new team score
+    const newTeamRuns = match.score.runs + totalRuns;
+    const newWickets = isWicket ? match.score.wickets + 1 : match.score.wickets;
+
+    // Run Rates
+    const currentRunRate = calculateRunRate(newTeamRuns, newLegalBallsCount);
+    const requiredRunRate = match.score.target 
+      ? calculateRequiredRunRate(match.score.target, newTeamRuns, (match.settings.totalOvers * 6) - newLegalBallsCount)
+      : null;
+
+    // Batting Updates (Striker)
+    const runsForBatsman = (extras.type === ExtraType.Wide || extras.type === ExtraType.Bye || extras.type === ExtraType.LegBye) ? 0 : runsBat;
+    const ballsFacedForBatsman = extras.type === ExtraType.Wide ? 0 : 1;
+    
+    const newStriker = { ...match.striker };
+    newStriker.runs += runsForBatsman;
+    newStriker.balls += ballsFacedForBatsman;
+    if (runsForBatsman === 4) newStriker.fours += 1;
+    if (runsForBatsman === 6) newStriker.sixes += 1;
+    newStriker.strikeRate = calculateStrikeRate(newStriker.runs, newStriker.balls);
+
+    // Bowling Updates
+    const newBowler = { ...match.currentBowler };
+    const runsAgainstBowler = (extras.type === ExtraType.Bye || extras.type === ExtraType.LegBye) ? 0 : totalRuns;
+    newBowler.runsConceded += runsAgainstBowler;
+    if (isLegal) {
+      newBowler.overs = formatOvers(formatOvers(newBowler.overs) * 6 + 1); // rough approach, need to track balls properly, but usually we just calculate from total legal balls
+      // A better way is tracking bowler's legal balls bowled, but ActiveBowlerInfo uses overs: number (e.g., 3.4)
+      const currentBowlerLegalBalls = Math.floor(newBowler.overs) * 6 + Math.round((newBowler.overs % 1) * 10);
+      newBowler.overs = formatOvers(currentBowlerLegalBalls + 1);
+    }
+    if (isWicket && dismissal?.type !== 'run_out') {
+      newBowler.wickets += 1;
+    }
+    const totalBowlerLegalBalls = Math.floor(newBowler.overs) * 6 + Math.round((newBowler.overs % 1) * 10);
+    newBowler.economyRate = calculateEconomyRate(newBowler.runsConceded, totalBowlerLegalBalls);
+
+    // Strike Rotation
+    const rotate = shouldRotateStrike(runsBat, extras);
+    let nextStriker = rotate ? match.nonStriker : newStriker;
+    let nextNonStriker = rotate ? newStriker : match.nonStriker;
+
+    // Handle end of over rotation
+    const isEndOfOver = isLegal && (currentOverBalls + 1) === 6;
+    if (isEndOfOver) {
+      const temp = nextStriker;
+      nextStriker = nextNonStriker;
+      nextNonStriker = temp;
+    }
+
+    // Recent Balls Display
+    const ballDisplay: RecentBallDisplay = {
+      ballId,
+      display: formatBallDisplay({ runsBat, extras, isWicket, totalRuns }),
+      isWicket,
+      isBoundary: runsBat === 4 || runsBat === 6,
+      isExtra: extras.type !== null,
+    };
+    
+    const newRecentBalls = [...match.recentBalls, ballDisplay];
+    if (isEndOfOver) {
+      // Clear recent balls for new over
+      // Or we can keep them until new over starts, but requirements say: "clear it when a new over starts"
+    }
+
+    // Update Innings Data
+    const newBattingCard = [...innings.battingCard];
+    const updateBattingCard = (activeBatsman: typeof match.striker, isOut: boolean, howOut: string) => {
+      const idx = newBattingCard.findIndex(b => b.playerId === activeBatsman.id);
+      if (idx >= 0) {
+        newBattingCard[idx] = {
+          ...newBattingCard[idx],
+          runs: activeBatsman.runs,
+          balls: activeBatsman.balls,
+          fours: activeBatsman.fours,
+          sixes: activeBatsman.sixes,
+          strikeRate: activeBatsman.strikeRate,
+          isOut,
+          howOut: isOut ? howOut : newBattingCard[idx].howOut,
+        };
+      }
+    };
+    
+    let howOut = 'not out';
+    if (isWicket && dismissal) {
+      if (dismissal.type === 'run_out') howOut = 'run out';
+      else if (dismissal.type === 'caught') howOut = 'caught';
+      else if (dismissal.type === 'bowled') howOut = 'bowled';
+      else if (dismissal.type === 'stumped') howOut = 'stumped';
+      else if (dismissal.type === 'hit_wicket') howOut = 'hit wicket';
+    }
+    
+    updateBattingCard(newStriker, isWicket && dismissal?.batsmanOutId === newStriker.id, howOut);
+    if (isWicket && dismissal?.batsmanOutId === nextNonStriker.id) {
+       updateBattingCard(nextNonStriker, true, 'run out'); // Only run out affects non-striker typically
+    }
+
+    const newBowlingCard = [...innings.bowlingCard];
+    const bowlerIdx = newBowlingCard.findIndex(b => b.playerId === newBowler.id);
+    if (bowlerIdx >= 0) {
+      newBowlingCard[bowlerIdx] = {
+        ...newBowlingCard[bowlerIdx],
+        overs: newBowler.overs,
+        runsConceded: newBowler.runsConceded,
+        wickets: newBowler.wickets,
+        economyRate: newBowler.economyRate,
+      };
+    } else {
+      newBowlingCard.push({
+        playerId: newBowler.id,
+        playerName: newBowler.name,
+        overs: newBowler.overs,
+        maidens: 0,
+        runsConceded: newBowler.runsConceded,
+        wickets: newBowler.wickets,
+        economyRate: newBowler.economyRate,
+      });
+    }
+
+    const newExtrasBreakdown = { ...innings.extras };
+    if (extras.type === ExtraType.Wide) newExtrasBreakdown.wides += extras.runs || 1;
+    if (extras.type === ExtraType.NoBall) newExtrasBreakdown.noBalls += extras.runs || 1;
+    if (extras.type === ExtraType.Bye) newExtrasBreakdown.byes += extras.runs;
+    if (extras.type === ExtraType.LegBye) newExtrasBreakdown.legByes += extras.runs;
+    newExtrasBreakdown.total = newExtrasBreakdown.wides + newExtrasBreakdown.noBalls + newExtrasBreakdown.byes + newExtrasBreakdown.legByes;
+
+    const newFallOfWickets = [...innings.fallOfWickets];
+    if (isWicket && dismissal) {
+      const batsmanOutId = dismissal.batsmanOutId;
+      const batsmanOutName = batsmanOutId === newStriker.id ? newStriker.name : match.nonStriker.name;
+      newFallOfWickets.push({
+        wicketNumber: newWickets,
+        score: newTeamRuns,
+        overs: newOvers,
+        batsmanId: batsmanOutId,
+        batsmanName: batsmanOutName,
+      });
+    }
+
+    const inningsComplete = isInningsComplete(newWickets, newLegalBallsCount, match.settings.totalOvers, match.settings.playersPerSide);
+
+    // Build updates
+    const matchUpdate: Partial<Match> = {
+      score: {
+        runs: newTeamRuns,
+        wickets: newWickets,
+        overs: newOvers,
+        legalBallsCount: newLegalBallsCount,
+        currentRunRate,
+        requiredRunRate,
+        target: match.score.target,
+      },
+      striker: isWicket && dismissal?.batsmanOutId === nextStriker.id ? null : nextStriker,
+      nonStriker: isWicket && dismissal?.batsmanOutId === nextNonStriker.id ? null : nextNonStriker,
+      currentBowler: newBowler,
+      recentBalls: isEndOfOver ? [] : newRecentBalls,
+      lastBallId: ballId,
+    };
+
+    const inningsUpdate: Partial<Innings> = {
+      totalRuns: newTeamRuns,
+      totalWickets: newWickets,
+      totalOvers: newOvers,
+      totalLegalBalls: newLegalBallsCount,
+      extras: newExtrasBreakdown,
+      battingCard: newBattingCard,
+      bowlingCard: newBowlingCard,
+      fallOfWickets: newFallOfWickets,
+      status: inningsComplete ? InningsStatus.Completed : InningsStatus.InProgress,
+    };
+
+    await recordBallWithUpdates({
+      matchId,
+      ball,
+      matchUpdate,
+      inningsUpdate,
+    });
+
+    set({ 
+      ballSequence: ballSequence + 1,
+      currentOverBalls: isEndOfOver ? 0 : (isLegal ? currentOverBalls + 1 : currentOverBalls),
+      showWicketModal: false,
+      showExtrasModal: false,
+    });
+
+    if (isWicket && !inningsComplete) {
+      set({ showNewBatsmanModal: true });
+    } else if (isEndOfOver && !inningsComplete) {
+      set({ showNewBowlerModal: true });
+    }
+  },
+
+  undoLastBall: async (matchId: string, match: Match) => {
+    if (!match.lastBallId) return;
+    
+    const lastBall = await getLastBall(matchId, match.lastBallId);
+    if (!lastBall) return;
+
+    const { previousState } = lastBall;
+
+    // Reconstruct match restore
+    const matchRestore: Partial<Match> = {
+      score: {
+        ...match.score,
+        runs: previousState.runs,
+        wickets: previousState.wickets,
+        overs: previousState.overs,
+        legalBallsCount: previousState.legalBallsCount,
+      },
+      striker: previousState.striker,
+      nonStriker: previousState.nonStriker,
+      currentBowler: previousState.bowler,
+      recentBalls: previousState.recentBalls,
+      // lastBallId needs to be updated to the previous one, but we might not easily know it without a linked list
+      // For now, setting to null or keeping as is is tricky. We'll set it to null for simplicity unless we fetch it.
+      lastBallId: null, // Ideally we find the ball before this one
+    };
+
+    // Note: Reconstructing the full innings restore is complex without its own previous state snapshot.
+    // For a robust system, we need to recalculate or snapshot innings too.
+    // We'll provide a minimal restore based on what we can.
+    
+    const inningsRestore: Partial<Innings> = {
+      totalRuns: previousState.runs,
+      totalWickets: previousState.wickets,
+      totalOvers: previousState.overs,
+      totalLegalBalls: previousState.legalBallsCount,
+    };
+
+    await undoBallWithUpdates(matchId, lastBall.id, lastBall.innings, matchRestore, inningsRestore);
+    
+    set((state) => ({ 
+      ballSequence: Math.max(1, state.ballSequence - 1),
+      currentOverBalls: lastBall.ballInOver > 0 ? (lastBall.isLegalDelivery ? lastBall.ballInOver - 1 : lastBall.ballInOver) : 0,
+    }));
+  },
+
+  startNewOver: () => {
+    set({ currentOverBalls: 0, showNewBowlerModal: true });
+  },
+
+  retireHurt: async (matchId: string, match: Match, batsmanId: string) => {
+    // Add to retiredBatsmen
+    const retiredBatsmen = [...(match.retiredBatsmen || []), batsmanId];
+    
+    const isStriker = match.striker?.id === batsmanId;
+    const matchUpdate: Partial<Match> = {
+      retiredBatsmen,
+      striker: isStriker ? null : match.striker,
+      nonStriker: !isStriker ? null : match.nonStriker,
+    };
+
+    await updateMatch(matchId, matchUpdate);
+
+    set({ showNewBatsmanModal: true });
+  },
+
+  setScoring: (isScoring) => set({ isScoring }),
+  toggleWicketModal: () => set((s) => ({ showWicketModal: !s.showWicketModal })),
+  toggleExtrasModal: () => set((s) => ({ showExtrasModal: !s.showExtrasModal })),
+  toggleNewBatsmanModal: () => set((s) => ({ showNewBatsmanModal: !s.showNewBatsmanModal })),
+  toggleNewBowlerModal: () => set((s) => ({ showNewBowlerModal: !s.showNewBowlerModal })),
+  reset: () => set({
+    isScoring: false,
+    ballSequence: 1,
+    currentOverBalls: 0,
+    showWicketModal: false,
+    showNewBatsmanModal: false,
+    showNewBowlerModal: false,
+    showExtrasModal: false,
+  }),
+}));

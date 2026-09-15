@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-cricket-green: #1a5e1f;
+  --color-cricket-green-light: #2d8a33;
+  --color-cricket-green-dark: #0e3d12;
+  --color-cricket-pitch: #c8a96e;
+  --color-boundary: #f59e0b;
+  --color-six: #8b5cf6;
+  --color-four: #3b82f6;
+  --color-wicket: #ef4444;
+  --color-dot-ball: #6b7280;
+  --color-extra: #f97316;
+}
+
+/* Mobile-first optimizations */
+html {
+  touch-action: manipulation;
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  @apply bg-gray-950 text-gray-100 antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Prevent text selection on scoring keypad */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
