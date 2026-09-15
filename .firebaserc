@@ -1,6 +1,7 @@
 {
   "projects": {
-    "scoring": "cricket-scorer-4926"
+    "scoring": "cricket-scorer-4926",
+    "default": "cricket-scorer-4926"
   },
   "targets": {},
   "etags": {}
