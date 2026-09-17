@@ -16,6 +16,28 @@ vi.mock('@/lib/firestore-service', () => ({
   updateMatch: vi.fn().mockResolvedValue(undefined),
 }));
 
+/** Helper: record N dot balls to advance currentOverBalls */
+async function recordNDotBalls(n: number, match: Match, innings: Innings) {
+  const store = useScoringStore.getState();
+  for (let i = 0; i < n; i++) {
+    await store.recordBall({
+      matchId: match.id,
+      match: {
+        ...match,
+        score: {
+          ...match.score,
+          legalBallsCount: useScoringStore.getState().currentOverBalls + (match.score.legalBallsCount ?? 0) - useScoringStore.getState().currentOverBalls,
+        },
+      },
+      innings,
+      runsBat: 0,
+      extras: { type: null, runs: 0 },
+      isWicket: false,
+      dismissal: null,
+    });
+  }
+}
+
 describe('Scoring Store', () => {
   let mockMatch: Match;
   let mockInnings: Innings;
@@ -128,6 +150,8 @@ describe('Scoring Store', () => {
     };
   });
 
+  // ─── Existing Tests ─────────────────────────────────────────────────────────
+
   it('throws an error if striker, nonStriker, or currentBowler is missing', async () => {
     mockMatch.striker = null;
 
@@ -231,5 +255,204 @@ describe('Scoring Store', () => {
     expect(payload.ball.isWicket).toBe(true);
     expect(payload.matchUpdate.score.wickets).toBe(1);
     expect(payload.matchUpdate.striker).toBeNull(); // Out batsman cleared to prompt new batsman
+  });
+
+  // ─── Phase I: New Tests ─────────────────────────────────────────────────────
+
+  describe('Bowler overs calculation (Bug #9 fix)', () => {
+    it('increments bowler overs correctly for consecutive balls: 0→0.1→0.2→…→1.0', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      const expectedOvers = [0.1, 0.2, 0.3, 0.4, 0.5, 1.0];
+
+      for (let i = 0; i < 6; i++) {
+        const state = useScoringStore.getState();
+        // Update match with current bowler overs from previous call
+        const prevPayload = i === 0 ? null : (recordBallWithUpdates as any).mock.calls[i - 1][0];
+        const currentBowler = prevPayload ? prevPayload.matchUpdate.currentBowler : mockMatch.currentBowler;
+        const currentScore = prevPayload ? prevPayload.matchUpdate.score : mockMatch.score;
+
+        await state.recordBall({
+          matchId: 'match_123',
+          match: { ...mockMatch, currentBowler, score: currentScore },
+          innings: mockInnings,
+          runsBat: 0,
+          extras: { type: null, runs: 0 },
+          isWicket: false,
+          dismissal: null,
+        });
+
+        const payload = (recordBallWithUpdates as any).mock.calls[i][0];
+        expect(payload.matchUpdate.currentBowler.overs).toBe(expectedOvers[i]);
+      }
+    });
+
+    it('does NOT use double formatOvers — 2.4 overs → next ball → 2.5', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      // Simulate bowler at 2.4 (=16 legal balls)
+      const bowlerAt2_4 = { ...mockMatch.currentBowler!, overs: 2.4 };
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: { ...mockMatch, currentBowler: bowlerAt2_4 },
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      // rawBowlerBalls(2.4) = 2*6 + 4 = 16, +1 = 17, formatOvers(17) = 2.5
+      expect(payload.matchUpdate.currentBowler.overs).toBe(2.5);
+    });
+
+    it('bowler overs correctly rolls over after 6 balls in an over: 0.5 → 1.0', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      const bowlerAt0_5 = { ...mockMatch.currentBowler!, overs: 0.5 };
+      // Set store to ball 5 of the over (5 legal balls bowled = currentOverBalls=5)
+      useScoringStore.setState({ currentOverBalls: 5, ballSequence: 6 });
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: {
+          ...mockMatch,
+          currentBowler: bowlerAt0_5,
+          score: { ...mockMatch.score, legalBallsCount: 5 },
+        },
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      // rawBowlerBalls(0.5) = 5, +1 = 6, formatOvers(6) = 1.0
+      expect(payload.matchUpdate.currentBowler.overs).toBe(1.0);
+    });
+  });
+
+  describe('Over lifecycle (Bug #10 fix)', () => {
+    it('shows showNewBowlerModal after 6th legal ball', async () => {
+      const store = useScoringStore.getState();
+      // Manually set currentOverBalls to 5 (about to bowl 6th)
+      useScoringStore.setState({ currentOverBalls: 5, ballSequence: 6 });
+
+      await store.recordBall({
+        matchId: 'match_123',
+        match: { ...mockMatch, score: { ...mockMatch.score, legalBallsCount: 5 } },
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      expect(useScoringStore.getState().showNewBowlerModal).toBe(true);
+      expect(useScoringStore.getState().currentOverBalls).toBe(0);
+    });
+
+    it('does NOT show showNewBowlerModal after 5th legal ball (not end of over)', async () => {
+      useScoringStore.setState({ currentOverBalls: 4, ballSequence: 5 });
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: { ...mockMatch, score: { ...mockMatch.score, legalBallsCount: 4 } },
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      expect(useScoringStore.getState().showNewBowlerModal).toBe(false);
+    });
+
+    it('sets pendingNewBowler=true when wicket falls on last ball of over', async () => {
+      useScoringStore.setState({ currentOverBalls: 5, ballSequence: 6 });
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: { ...mockMatch, score: { ...mockMatch.score, legalBallsCount: 5 } },
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: true,
+        dismissal: {
+          type: WicketType.Bowled,
+          batsmanOutId: 'p1',
+          fielderId: null,
+          newBatsmanId: null,
+        },
+      });
+
+      const state = useScoringStore.getState();
+      expect(state.showNewBatsmanModal).toBe(true);
+      expect(state.pendingNewBowler).toBe(true);
+      expect(state.showNewBowlerModal).toBe(false); // Not shown yet — awaits batsman first
+    });
+  });
+
+  describe('Strike rotation', () => {
+    it('does NOT rotate on even runs (2)', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: mockMatch,
+        innings: mockInnings,
+        runsBat: 2,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      expect(payload.matchUpdate.striker.id).toBe('p1'); // No rotation
+    });
+
+    it('rotates strike at end of over regardless of runs scored', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+      useScoringStore.setState({ currentOverBalls: 5, ballSequence: 6 });
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: { ...mockMatch, score: { ...mockMatch.score, legalBallsCount: 5 } },
+        innings: mockInnings,
+        runsBat: 2, // Even — no bat rotation, but end-of-over always rotates
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      // End of over: batsmen swap so p2 faces next over
+      expect(payload.matchUpdate.striker.id).toBe('p2');
+    });
+  });
+
+  describe('swapBatsmen action (Bug #14)', () => {
+    it('swaps striker and nonStriker correctly', async () => {
+      const { updateMatch } = await import('@/lib/firestore-service');
+
+      await useScoringStore.getState().swapBatsmen('match_123', mockMatch);
+
+      expect(updateMatch).toHaveBeenCalledWith('match_123', {
+        striker: mockMatch.nonStriker,
+        nonStriker: mockMatch.striker,
+      });
+    });
+
+    it('does nothing if striker or nonStriker is null', async () => {
+      const { updateMatch } = await import('@/lib/firestore-service');
+      mockMatch.striker = null;
+
+      await useScoringStore.getState().swapBatsmen('match_123', mockMatch);
+
+      expect(updateMatch).not.toHaveBeenCalled();
+    });
   });
 });

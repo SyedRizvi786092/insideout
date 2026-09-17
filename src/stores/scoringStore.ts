@@ -7,8 +7,6 @@ import {
   Dismissal,
   PreviousState,
   RecentBallDisplay,
-  BattingCardEntry,
-  BowlingCardEntry,
   ExtraType,
   InningsStatus,
 } from '@/types/cricket';
@@ -49,18 +47,30 @@ interface ScoringState {
   showNewBatsmanModal: boolean;
   showNewBowlerModal: boolean;
   showExtrasModal: boolean;
+  /** True when the over ended on the same ball as a wicket — after new batsman is confirmed, new bowler modal must open */
+  pendingNewBowler: boolean;
 
   recordBall: (params: RecordBallParams) => Promise<void>;
   undoLastBall: (matchId: string, match: Match) => Promise<void>;
   startNewOver: () => void;
   retireHurt: (matchId: string, match: Match, batsmanId: string) => Promise<void>;
-  
+  swapBatsmen: (matchId: string, match: Match) => Promise<void>;
+
   setScoring: (isScoring: boolean) => void;
   toggleWicketModal: () => void;
   toggleExtrasModal: () => void;
   toggleNewBatsmanModal: () => void;
   toggleNewBowlerModal: () => void;
+  clearPendingNewBowler: () => void;
   reset: () => void;
+}
+
+/**
+ * Convert display-format overs (e.g. 2.4) to raw legal ball count (e.g. 16).
+ * formatOvers stores balls-in-over as tenths, not sixths, so we parse accordingly.
+ */
+function rawBowlerBalls(overs: number): number {
+  return Math.floor(overs) * 6 + Math.round((overs % 1) * 10);
 }
 
 export const useScoringStore = create<ScoringState>((set, get) => ({
@@ -71,6 +81,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
   showNewBatsmanModal: false,
   showNewBowlerModal: false,
   showExtrasModal: false,
+  pendingNewBowler: false,
 
   recordBall: async ({
     matchId,
@@ -86,7 +97,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     }
 
     const isLegal = isLegalDelivery(extras.type);
-    
+
     // Total runs for this delivery
     let totalRuns = runsBat;
     if (extras.type === ExtraType.Wide || extras.type === ExtraType.NoBall) {
@@ -110,15 +121,15 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     };
 
     const { ballSequence, currentOverBalls } = get();
-    
+
     // Calculate new legal balls and overs
     const newLegalBallsCount = isLegal ? match.score.legalBallsCount + 1 : match.score.legalBallsCount;
     const newOvers = formatOvers(newLegalBallsCount);
-    
+
     // Create the Ball object
     const ballId = generateBallId(match.currentInnings, ballSequence);
     const overNumber = Math.floor(newLegalBallsCount / 6);
-    
+
     const ball: Ball = {
       id: ballId,
       innings: match.currentInnings,
@@ -143,14 +154,14 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
 
     // Run Rates
     const currentRunRate = calculateRunRate(newTeamRuns, newLegalBallsCount);
-    const requiredRunRate = match.score.target 
+    const requiredRunRate = match.score.target
       ? calculateRequiredRunRate(match.score.target, newTeamRuns, (match.settings.totalOvers * 6) - newLegalBallsCount)
       : null;
 
     // Batting Updates (Striker)
     const runsForBatsman = (extras.type === ExtraType.Wide || extras.type === ExtraType.Bye || extras.type === ExtraType.LegBye) ? 0 : runsBat;
     const ballsFacedForBatsman = extras.type === ExtraType.Wide ? 0 : 1;
-    
+
     const newStriker = { ...match.striker };
     newStriker.runs += runsForBatsman;
     newStriker.balls += ballsFacedForBatsman;
@@ -158,20 +169,19 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     if (runsForBatsman === 6) newStriker.sixes += 1;
     newStriker.strikeRate = calculateStrikeRate(newStriker.runs, newStriker.balls);
 
-    // Bowling Updates
+    // Bowling Updates — FIX: compute raw ball count first, THEN increment once
     const newBowler = { ...match.currentBowler };
     const runsAgainstBowler = (extras.type === ExtraType.Bye || extras.type === ExtraType.LegBye) ? 0 : totalRuns;
     newBowler.runsConceded += runsAgainstBowler;
     if (isLegal) {
-      newBowler.overs = formatOvers(formatOvers(newBowler.overs) * 6 + 1); // rough approach, need to track balls properly, but usually we just calculate from total legal balls
-      // A better way is tracking bowler's legal balls bowled, but ActiveBowlerInfo uses overs: number (e.g., 3.4)
-      const currentBowlerLegalBalls = Math.floor(newBowler.overs) * 6 + Math.round((newBowler.overs % 1) * 10);
-      newBowler.overs = formatOvers(currentBowlerLegalBalls + 1);
+      // rawBowlerBalls converts display format (e.g. 2.4) to raw count (e.g. 16)
+      // then we add 1 and convert back to display format — no double-call
+      newBowler.overs = formatOvers(rawBowlerBalls(newBowler.overs) + 1);
     }
     if (isWicket && dismissal?.type !== 'run_out') {
       newBowler.wickets += 1;
     }
-    const totalBowlerLegalBalls = Math.floor(newBowler.overs) * 6 + Math.round((newBowler.overs % 1) * 10);
+    const totalBowlerLegalBalls = rawBowlerBalls(newBowler.overs);
     newBowler.economyRate = calculateEconomyRate(newBowler.runsConceded, totalBowlerLegalBalls);
 
     // Strike Rotation
@@ -195,12 +205,8 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       isBoundary: runsBat === 4 || runsBat === 6,
       isExtra: extras.type !== null,
     };
-    
+
     const newRecentBalls = [...match.recentBalls, ballDisplay];
-    if (isEndOfOver) {
-      // Clear recent balls for new over
-      // Or we can keep them until new over starts, but requirements say: "clear it when a new over starts"
-    }
 
     // Update Innings Data
     const newBattingCard = [...innings.battingCard];
@@ -219,7 +225,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
         };
       }
     };
-    
+
     let howOut = 'not out';
     if (isWicket && dismissal) {
       if (dismissal.type === 'run_out') howOut = 'run out';
@@ -228,7 +234,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       else if (dismissal.type === 'stumped') howOut = 'stumped';
       else if (dismissal.type === 'hit_wicket') howOut = 'hit wicket';
     }
-    
+
     updateBattingCard(newStriker, isWicket && dismissal?.batsmanOutId === newStriker.id, howOut);
     if (isWicket && dismissal?.batsmanOutId === nextNonStriker.id) {
        updateBattingCard(nextNonStriker, true, 'run out'); // Only run out affects non-striker typically
@@ -315,23 +321,31 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       inningsUpdate,
     });
 
-    set({ 
+    set({
       ballSequence: ballSequence + 1,
       currentOverBalls: isEndOfOver ? 0 : (isLegal ? currentOverBalls + 1 : currentOverBalls),
       showWicketModal: false,
       showExtrasModal: false,
     });
 
-    if (isWicket && !inningsComplete) {
+    if (inningsComplete) {
+      // No modals when innings is over
+      return;
+    }
+
+    if (isWicket && isEndOfOver) {
+      // Both conditions: show new batsman first, then new bowler
+      set({ showNewBatsmanModal: true, pendingNewBowler: true });
+    } else if (isWicket) {
       set({ showNewBatsmanModal: true });
-    } else if (isEndOfOver && !inningsComplete) {
+    } else if (isEndOfOver) {
       set({ showNewBowlerModal: true });
     }
   },
 
   undoLastBall: async (matchId: string, match: Match) => {
     if (!match.lastBallId) return;
-    
+
     const lastBall = await getLastBall(matchId, match.lastBallId);
     if (!lastBall) return;
 
@@ -350,15 +364,9 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       nonStriker: previousState.nonStriker,
       currentBowler: previousState.bowler,
       recentBalls: previousState.recentBalls,
-      // lastBallId needs to be updated to the previous one, but we might not easily know it without a linked list
-      // For now, setting to null or keeping as is is tricky. We'll set it to null for simplicity unless we fetch it.
-      lastBallId: null, // Ideally we find the ball before this one
+      lastBallId: null,
     };
 
-    // Note: Reconstructing the full innings restore is complex without its own previous state snapshot.
-    // For a robust system, we need to recalculate or snapshot innings too.
-    // We'll provide a minimal restore based on what we can.
-    
     const inningsRestore: Partial<Innings> = {
       totalRuns: previousState.runs,
       totalWickets: previousState.wickets,
@@ -367,8 +375,8 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     };
 
     await undoBallWithUpdates(matchId, lastBall.id, lastBall.innings, matchRestore, inningsRestore);
-    
-    set((state) => ({ 
+
+    set((state) => ({
       ballSequence: Math.max(1, state.ballSequence - 1),
       currentOverBalls: lastBall.ballInOver > 0 ? (lastBall.isLegalDelivery ? lastBall.ballInOver - 1 : lastBall.ballInOver) : 0,
     }));
@@ -379,9 +387,8 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
   },
 
   retireHurt: async (matchId: string, match: Match, batsmanId: string) => {
-    // Add to retiredBatsmen
     const retiredBatsmen = [...(match.retiredBatsmen || []), batsmanId];
-    
+
     const isStriker = match.striker?.id === batsmanId;
     const matchUpdate: Partial<Match> = {
       retiredBatsmen,
@@ -394,11 +401,20 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     set({ showNewBatsmanModal: true });
   },
 
+  swapBatsmen: async (matchId: string, match: Match) => {
+    if (!match.striker || !match.nonStriker) return;
+    await updateMatch(matchId, {
+      striker: match.nonStriker,
+      nonStriker: match.striker,
+    });
+  },
+
   setScoring: (isScoring) => set({ isScoring }),
   toggleWicketModal: () => set((s) => ({ showWicketModal: !s.showWicketModal })),
   toggleExtrasModal: () => set((s) => ({ showExtrasModal: !s.showExtrasModal })),
   toggleNewBatsmanModal: () => set((s) => ({ showNewBatsmanModal: !s.showNewBatsmanModal })),
   toggleNewBowlerModal: () => set((s) => ({ showNewBowlerModal: !s.showNewBowlerModal })),
+  clearPendingNewBowler: () => set({ pendingNewBowler: false }),
   reset: () => set({
     isScoring: false,
     ballSequence: 1,
@@ -407,5 +423,6 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     showNewBatsmanModal: false,
     showNewBowlerModal: false,
     showExtrasModal: false,
+    pendingNewBowler: false,
   }),
 }));
