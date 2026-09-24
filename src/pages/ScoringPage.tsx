@@ -75,8 +75,8 @@ function PlayerNameInput({
 }) {
   const [focused, setFocused] = useState(false);
 
-  // Exclude exact matches so that after clicking a suggestion the dropdown
-  // disappears (the chosen name no longer passes the filter).
+  // Exclude exact matches so the dropdown disappears after a suggestion is
+  // selected (the chosen name no longer passes the filter).
   const filtered = focused && value.length >= 1
     ? dbPlayers
         .filter(
@@ -97,7 +97,8 @@ function PlayerNameInput({
           setFocused(true);
           setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 300);
         }}
-        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        // No setTimeout needed — onPointerDown preventDefault suppresses blur
+        onBlur={() => setFocused(false)}
         placeholder={placeholder}
         autoFocus={autoFocus}
         className={cn(
@@ -110,9 +111,10 @@ function PlayerNameInput({
           {filtered.map((p) => (
             <div
               key={p.id}
-              onMouseDown={(e) => {
-                // preventDefault keeps the input focused so onBlur doesn't
-                // fire before we update the value, allowing the click to land.
+              onPointerDown={(e) => {
+                // onPointerDown fires before blur on ALL devices (desktop mouse
+                // and mobile touch including iOS Safari). preventDefault()
+                // suppresses the input blur so the handler runs cleanly.
                 e.preventDefault();
                 onChange(p.name);
                 setFocused(false);
