@@ -75,17 +75,12 @@ function PlayerNameInput({
 }) {
   const [focused, setFocused] = useState(false);
 
-  // Exclude exact matches so the dropdown disappears after a suggestion is
-  // selected (the chosen name no longer passes the filter).
-  const filtered = focused && value.length >= 1
-    ? dbPlayers
-        .filter(
-          (p) =>
-            p.name.toLowerCase().includes(value.toLowerCase()) &&
-            p.name.toLowerCase() !== value.toLowerCase()
-        )
-        .slice(0, 5)
-    : [];
+  // Exclude exact matches so the dropdown closes as soon as a suggestion is selected.
+  const filtered = dbPlayers.filter(
+    (p) =>
+      p.name.toLowerCase().includes(value.toLowerCase()) &&
+      p.name.toLowerCase() !== value.toLowerCase()
+  );
 
   return (
     <div className="relative">
@@ -97,8 +92,7 @@ function PlayerNameInput({
           setFocused(true);
           setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 300);
         }}
-        // No setTimeout needed — onPointerDown preventDefault suppresses blur
-        onBlur={() => setFocused(false)}
+        onBlur={() => setTimeout(() => setFocused(false), 200)}
         placeholder={placeholder}
         autoFocus={autoFocus}
         className={cn(
@@ -106,19 +100,12 @@ function PlayerNameInput({
           className
         )}
       />
-      {filtered.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-20 overflow-hidden">
+      {focused && value && filtered.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-20 max-h-40 overflow-y-auto">
           {filtered.map((p) => (
             <div
               key={p.id}
-              onPointerDown={(e) => {
-                // onPointerDown fires before blur on ALL devices (desktop mouse
-                // and mobile touch including iOS Safari). preventDefault()
-                // suppresses the input blur so the handler runs cleanly.
-                e.preventDefault();
-                onChange(p.name);
-                setFocused(false);
-              }}
+              onClick={() => onChange(p.name)}
               className="px-4 py-2.5 text-white hover:bg-gray-700 text-sm cursor-pointer"
             >
               {p.name}
