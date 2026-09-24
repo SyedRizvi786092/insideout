@@ -228,16 +228,32 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
 
     let howOut = 'not out';
     if (isWicket && dismissal) {
-      if (dismissal.type === 'run_out') howOut = 'run out';
-      else if (dismissal.type === 'caught') howOut = 'caught';
-      else if (dismissal.type === 'bowled') howOut = 'bowled';
-      else if (dismissal.type === 'stumped') howOut = 'stumped';
-      else if (dismissal.type === 'hit_wicket') howOut = 'hit wicket';
+      const bowlerName = match.currentBowler.name;
+      const fielderName = dismissal.fielderId; // stores the fielder's display name
+      switch (dismissal.type) {
+        case 'bowled':
+          howOut = `b ${bowlerName}`;
+          break;
+        case 'caught':
+          howOut = fielderName ? `c ${fielderName} b ${bowlerName}` : `c & b ${bowlerName}`;
+          break;
+        case 'stumped':
+          howOut = fielderName ? `st ${fielderName} b ${bowlerName}` : `st b ${bowlerName}`;
+          break;
+        case 'run_out':
+          howOut = fielderName ? `Run Out (${fielderName})` : 'Run Out';
+          break;
+        case 'hit_wicket':
+          howOut = `Hit Wicket b ${bowlerName}`;
+          break;
+      }
     }
 
     updateBattingCard(newStriker, isWicket && dismissal?.batsmanOutId === newStriker.id, howOut);
     if (isWicket && dismissal?.batsmanOutId === nextNonStriker.id) {
-       updateBattingCard(nextNonStriker, true, 'run out'); // Only run out affects non-striker typically
+      // Non-striker is only out via run out; include fielder name if available
+      const runOutText = dismissal.fielderId ? `Run Out (${dismissal.fielderId})` : 'Run Out';
+      updateBattingCard(nextNonStriker, true, runOutText);
     }
 
     const newBowlingCard = [...innings.bowlingCard];

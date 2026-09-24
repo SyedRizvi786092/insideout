@@ -455,4 +455,100 @@ describe('Scoring Store', () => {
       expect(updateMatch).not.toHaveBeenCalled();
     });
   });
+
+  describe('dismissal text formatting (Bug #9)', () => {
+    it('formats Bowled howOut as "b BowlerName"', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: mockMatch,
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: true,
+        dismissal: {
+          type: WicketType.Bowled,
+          batsmanOutId: 'p1',
+          fielderId: null,
+          newBatsmanId: null,
+        },
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      const strikerCard = payload.inningsUpdate.battingCard.find((b: any) => b.playerId === 'p1');
+      expect(strikerCard.isOut).toBe(true);
+      expect(strikerCard.howOut).toBe('b Bowler 1');
+    });
+
+    it('formats Caught howOut as "c FielderName b BowlerName"', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: mockMatch,
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: true,
+        dismissal: {
+          type: WicketType.Caught,
+          batsmanOutId: 'p1',
+          fielderId: 'Ali',
+          newBatsmanId: null,
+        },
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      const strikerCard = payload.inningsUpdate.battingCard.find((b: any) => b.playerId === 'p1');
+      expect(strikerCard.isOut).toBe(true);
+      expect(strikerCard.howOut).toBe('c Ali b Bowler 1');
+    });
+
+    it('formats Caught without fielder as "c & b BowlerName"', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: mockMatch,
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: true,
+        dismissal: {
+          type: WicketType.Caught,
+          batsmanOutId: 'p1',
+          fielderId: null,
+          newBatsmanId: null,
+        },
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      const strikerCard = payload.inningsUpdate.battingCard.find((b: any) => b.playerId === 'p1');
+      expect(strikerCard.howOut).toBe('c & b Bowler 1');
+    });
+
+    it('formats Run Out howOut as "Run Out (FielderName)"', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: mockMatch,
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: true,
+        dismissal: {
+          type: WicketType.RunOut,
+          batsmanOutId: 'p1',
+          fielderId: 'Rashid',
+          newBatsmanId: null,
+        },
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      const strikerCard = payload.inningsUpdate.battingCard.find((b: any) => b.playerId === 'p1');
+      expect(strikerCard.howOut).toBe('Run Out (Rashid)');
+    });
+  });
 });
