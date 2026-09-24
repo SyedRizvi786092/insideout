@@ -49,6 +49,8 @@ interface ScoringState {
   showExtrasModal: boolean;
   /** True when the over ended on the same ball as a wicket — after new batsman is confirmed, new bowler modal must open */
   pendingNewBowler: boolean;
+  /** Number of consecutive undos performed since the last ball was recorded. Capped at 3. */
+  undoDepth: number;
 
   recordBall: (params: RecordBallParams) => Promise<void>;
   undoLastBall: (matchId: string, match: Match) => Promise<void>;
@@ -82,6 +84,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
   showNewBowlerModal: false,
   showExtrasModal: false,
   pendingNewBowler: false,
+  undoDepth: 0,
 
   recordBall: async ({
     matchId,
@@ -106,7 +109,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       totalRuns += extras.runs;
     }
 
-    // Previous State Snapshot
+    // Previous State Snapshot — captures everything needed to fully undo this ball
     const previousState: PreviousState = {
       runs: match.score.runs,
       wickets: match.score.wickets,
@@ -118,6 +121,13 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       nonStriker: { ...match.nonStriker },
       bowler: { ...match.currentBowler },
       recentBalls: [...match.recentBalls],
+      // Chain link: points to the ball that preceded this one, enabling multi-undo
+      previousBallId: match.lastBallId,
+      // Full innings snapshot so undo restores the scorecard correctly (Bug #10)
+      battingCard: innings.battingCard.map(e => ({ ...e })),
+      bowlingCard: innings.bowlingCard.map(e => ({ ...e })),
+      extras: { ...innings.extras },
+      fallOfWickets: innings.fallOfWickets.map(e => ({ ...e })),
     };
 
     const { ballSequence, currentOverBalls } = get();
@@ -342,6 +352,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       currentOverBalls: isEndOfOver ? 0 : (isLegal ? currentOverBalls + 1 : currentOverBalls),
       showWicketModal: false,
       showExtrasModal: false,
+      undoDepth: 0, // reset so fresh 3-undo window starts from this ball
     });
 
     if (inningsComplete) {
@@ -360,7 +371,9 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
   },
 
   undoLastBall: async (matchId: string, match: Match) => {
-    if (!match.lastBallId) return;
+    const { undoDepth } = get();
+    // Guard: no ball to undo, or undo limit reached
+    if (!match.lastBallId || undoDepth >= 3) return;
 
     const lastBall = await getLastBall(matchId, match.lastBallId);
     if (!lastBall) return;
@@ -380,14 +393,20 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
       nonStriker: previousState.nonStriker,
       currentBowler: previousState.bowler,
       recentBalls: previousState.recentBalls,
-      lastBallId: null,
+      // Chain link: point to the ball BEFORE the one we're undoing, not null
+      lastBallId: previousState.previousBallId ?? null,
     };
 
+    // Full innings restore — scoreboard is now correct after undo (Bug #10)
     const inningsRestore: Partial<Innings> = {
       totalRuns: previousState.runs,
       totalWickets: previousState.wickets,
       totalOvers: previousState.overs,
       totalLegalBalls: previousState.legalBallsCount,
+      battingCard: previousState.battingCard,
+      bowlingCard: previousState.bowlingCard,
+      extras: previousState.extras,
+      fallOfWickets: previousState.fallOfWickets,
     };
 
     await undoBallWithUpdates(matchId, lastBall.id, lastBall.innings, matchRestore, inningsRestore);
@@ -395,6 +414,7 @@ export const useScoringStore = create<ScoringState>((set, get) => ({
     set((state) => ({
       ballSequence: Math.max(1, state.ballSequence - 1),
       currentOverBalls: lastBall.ballInOver > 0 ? (lastBall.isLegalDelivery ? lastBall.ballInOver - 1 : lastBall.ballInOver) : 0,
+      undoDepth: state.undoDepth + 1,
     }));
   },
 

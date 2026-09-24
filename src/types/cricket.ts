@@ -287,6 +287,7 @@ export interface Dismissal {
 
 /** Snapshot of the match state BEFORE this ball was bowled (for undo) */
 export interface PreviousState {
+  // Match-level snapshot
   runs: number;
   wickets: number;
   overs: number;
@@ -297,6 +298,13 @@ export interface PreviousState {
   nonStriker: ActiveBatsmanInfo;
   bowler: ActiveBowlerInfo;
   recentBalls: RecentBallDisplay[];
+  /** ID of the ball that existed before this ball — enables chaining undos */
+  previousBallId: string | null;
+  // Innings-level snapshot (needed to fully restore scorecard on undo)
+  battingCard: BattingCardEntry[];
+  bowlingCard: BowlingCardEntry[];
+  extras: ExtrasBreakdown;
+  fallOfWickets: FallOfWicket[];
 }
 
 export interface Ball {

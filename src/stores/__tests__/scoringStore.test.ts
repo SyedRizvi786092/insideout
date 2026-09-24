@@ -551,4 +551,95 @@ describe('Scoring Store', () => {
       expect(strikerCard.howOut).toBe('Run Out (Rashid)');
     });
   });
+
+  describe('multi-undo chain (Bugs #7 + #10)', () => {
+    /** Build a fake Ball document with a full PreviousState snapshot */
+    function makeFakeBall(ballId: string, previousBallId: string | null) {
+      return {
+        id: ballId,
+        innings: 1,
+        overNumber: 0,
+        ballInOver: 1,
+        ballSequence: 1,
+        isLegalDelivery: true,
+        isWicket: false,
+        dismissal: null,
+        previousState: {
+          runs: 0,
+          wickets: 0,
+          overs: 0,
+          legalBallsCount: 0,
+          strikerId: 'p1',
+          nonStrikerId: 'p2',
+          striker: mockMatch.striker,
+          nonStriker: mockMatch.nonStriker,
+          bowler: mockMatch.currentBowler,
+          recentBalls: [],
+          previousBallId,
+          battingCard: [],
+          bowlingCard: [],
+          extras: { wides: 0, noBalls: 0, byes: 0, legByes: 0, total: 0 },
+          fallOfWickets: [],
+        },
+      };
+    }
+
+    it('undoDepth increments by 1 on each undo call', async () => {
+      const { getLastBall } = await import('@/lib/firestore-service');
+      (getLastBall as any).mockResolvedValueOnce(makeFakeBall('ball_2', 'ball_1'));
+
+      // Give match a lastBallId so undo can run
+      const matchWithBall = { ...mockMatch, lastBallId: 'ball_2' };
+
+      expect(useScoringStore.getState().undoDepth).toBe(0);
+      await useScoringStore.getState().undoLastBall('match_123', matchWithBall);
+      expect(useScoringStore.getState().undoDepth).toBe(1);
+    });
+
+    it('undo is blocked when undoDepth reaches 3', async () => {
+      const { undoBallWithUpdates } = await import('@/lib/firestore-service');
+      // Manually set undoDepth to 3
+      useScoringStore.setState({ undoDepth: 3 });
+
+      const matchWithBall = { ...mockMatch, lastBallId: 'ball_1' };
+      await useScoringStore.getState().undoLastBall('match_123', matchWithBall);
+
+      // undoBallWithUpdates should NOT have been called
+      expect(undoBallWithUpdates).not.toHaveBeenCalled();
+    });
+
+    it('undoDepth resets to 0 when a new ball is recorded', async () => {
+      useScoringStore.setState({ undoDepth: 2 });
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: mockMatch,
+        innings: mockInnings,
+        runsBat: 1,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      expect(useScoringStore.getState().undoDepth).toBe(0);
+    });
+
+    it('previousState.previousBallId is stored as the current match.lastBallId', async () => {
+      const { recordBallWithUpdates } = await import('@/lib/firestore-service');
+      const matchWithLastBall = { ...mockMatch, lastBallId: 'ball_existing' };
+
+      await useScoringStore.getState().recordBall({
+        matchId: 'match_123',
+        match: matchWithLastBall,
+        innings: mockInnings,
+        runsBat: 0,
+        extras: { type: null, runs: 0 },
+        isWicket: false,
+        dismissal: null,
+      });
+
+      const payload = (recordBallWithUpdates as any).mock.calls[0][0];
+      expect(payload.ball.previousState.previousBallId).toBe('ball_existing');
+    });
+  });
 });

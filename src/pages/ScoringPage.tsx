@@ -360,6 +360,7 @@ export default function ScoringPage() {
   const {
     currentOverBalls,
     pendingNewBowler,
+    undoDepth,
     recordBall,
     undoLastBall,
     retireHurt,
@@ -958,14 +959,18 @@ export default function ScoringPage() {
             style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
           >
             <button
-              onClick={() => isReady && undoLastBall(match.id, match)}
+              onClick={() => isReady && undoDepth < 3 && match.lastBallId && undoLastBall(match.id, match)}
               className={cn(
                 'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
-                isReady ? 'text-gray-400 hover:text-white' : 'text-gray-700'
+                isReady && undoDepth < 3 && match.lastBallId
+                  ? 'text-gray-400 hover:text-white'
+                  : 'text-gray-700 cursor-not-allowed'
               )}
             >
               <Undo2 className="w-5 h-5" />
-              <span className="text-[10px]">Undo</span>
+              <span className="text-[10px]">
+                {undoDepth >= 3 ? 'Undo (3/3)' : 'Undo'}
+              </span>
             </button>
             <button
               onClick={() => isReady && swapBatsmen(match.id, match)}
