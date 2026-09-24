@@ -966,7 +966,7 @@ export default function ScoringPage() {
               )}
             >
               <ArrowLeftRight className="w-5 h-5" />
-              <span className="text-[10px]">Swap</span>
+              <span className="text-[10px]">Swap Strike</span>
             </button>
             <button
               onClick={() => isReady && match.striker && retireHurt(match.id, match, match.striker.id)}

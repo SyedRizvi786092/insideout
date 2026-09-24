@@ -33,18 +33,33 @@ Phase 3 — bugs, redesigns, and architecture fixes complete. Build passes, 42 t
 - [x] Architecture fix H1 — firestore.indexes.json composite index for onLiveMatchesSnapshot
 - [x] Phase I — 10 new unit tests (42 total, all passing)
 
+### Phase 4 — New Bugs Micro-Batches
+- [x] **Batch 1 (Quick Wins)**:
+  - [x] Bug #1: Renamed "Players" label to "Players Per Side" in `MatchSetupPage.tsx`
+  - [x] Bug #3: Added "Cancel" button in `MatchSetupPage.tsx`
+  - [x] Bug #8: Renamed "Swap" button to "Swap Strike" in `ScoringPage.tsx`
+- [ ] **Batch 2**: Bug #5 (Player suggestions dismiss on click)
+- [ ] **Batch 3**: Bug #9 (Dismissal text formatting)
+- [ ] **Batch 4**: Bugs #7 + #10 (Undo multi-step & scorecard math restoration)
+- [ ] **Batch 5**: Bug #4 (Route consolidation)
+- [ ] **Batch 6**: Bugs #6 + #13 (Sticky action bar & universal wicket modal viewport architecture)
+- [ ] **Batch 7**: Bug #11 (Overs tab data refresh & dynamic team labels)
+- [ ] **Batch 8**: Bug #12 (Retired hurt player score preservation)
+- [ ] **Batch 9**: Bug #2 (Toss toggle switch)
+
 ---
 
 ## 3. Remaining Work
-- [ ] Phase D2: Scorecard.tsx collapsible innings panels redesign (Cricbuzz-style)
-- [ ] Phase H2/H3: Google Sign-In linking for anonymous users
-- [ ] Deploy firestore indexes: `firebase deploy --only firestore:indexes`
-- [ ] Push Phase 3 changes to GitHub and deploy preview for manual verification
+- [ ] Complete Phase 4 batches 2 through 9 in sequential micro-batches.
+- [ ] **Deferred Lower-Priority Items** (To be tackled AFTER resolving Phase 4 bugs):
+  - [ ] Phase D2–D4: Scorecard collapsible innings panels redesign (Cricbuzz-style), `matchStore` subscription to `innings2`, and passing both innings in `MatchViewPage`.
+  - [ ] Phase H2–H3: Google Sign-In linking for anonymous users (`authStore.linkWithGoogle` and banner in `MatchSetupPage`).
+  - [ ] Deploy Firestore composite index (`firebase deploy --only firestore:indexes`).
 
 ---
 
 ## 4. Exact Next Step
-Run `git push` to push Phase 3 changes, create PR for preview URL, and perform manual verification.
+Await user verification and approval of Batch 1 before proceeding to Batch 2 (Bug #5).
 
 ---
 

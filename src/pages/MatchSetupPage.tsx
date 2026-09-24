@@ -286,7 +286,7 @@ export default function MatchSetupPage() {
               {!isOversValid && <p className="text-xs text-red-400 mt-1">Must be 1–20</p>}
             </div>
             <div className="flex-1">
-              <label className="block text-sm text-gray-400 mb-1">Players</label>
+              <label className="block text-sm text-gray-400 mb-1">Players Per Side</label>
               <input
                 type="number"
                 inputMode="numeric"
@@ -508,6 +508,14 @@ export default function MatchSetupPage() {
           )}
         >
           {isStarting ? 'Creating Match...' : 'Start Match'}
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          disabled={isStarting}
+          className="w-full mt-3 py-3 rounded-xl border border-gray-700 bg-gray-800/80 hover:bg-gray-800 text-gray-300 hover:text-white font-medium text-base transition-colors"
+        >
+          Cancel
         </button>
         {!canStart && !isStarting && (
           <p className="text-center text-xs text-gray-500 mt-2">
