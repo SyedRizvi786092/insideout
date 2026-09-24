@@ -73,8 +73,18 @@ function PlayerNameInput({
   className?: string;
   autoFocus?: boolean;
 }) {
-  const suggestions = value.length >= 1
-    ? dbPlayers.filter(p => p.name.toLowerCase().includes(value.toLowerCase())).slice(0, 5)
+  const [focused, setFocused] = useState(false);
+
+  // Exclude exact matches so that after clicking a suggestion the dropdown
+  // disappears (the chosen name no longer passes the filter).
+  const filtered = focused && value.length >= 1
+    ? dbPlayers
+        .filter(
+          (p) =>
+            p.name.toLowerCase().includes(value.toLowerCase()) &&
+            p.name.toLowerCase() !== value.toLowerCase()
+        )
+        .slice(0, 5)
     : [];
 
   return (
@@ -83,7 +93,11 @@ function PlayerNameInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 300)}
+        onFocus={(e) => {
+          setFocused(true);
+          setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 300);
+        }}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
         placeholder={placeholder}
         autoFocus={autoFocus}
         className={cn(
@@ -91,12 +105,18 @@ function PlayerNameInput({
           className
         )}
       />
-      {suggestions.length > 0 && (
+      {filtered.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-20 overflow-hidden">
-          {suggestions.map((p) => (
+          {filtered.map((p) => (
             <div
               key={p.id}
-              onMouseDown={(e) => { e.preventDefault(); onChange(p.name); }}
+              onMouseDown={(e) => {
+                // preventDefault keeps the input focused so onBlur doesn't
+                // fire before we update the value, allowing the click to land.
+                e.preventDefault();
+                onChange(p.name);
+                setFocused(false);
+              }}
               className="px-4 py-2.5 text-white hover:bg-gray-700 text-sm cursor-pointer"
             >
               {p.name}
