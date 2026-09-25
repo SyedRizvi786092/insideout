@@ -8,7 +8,7 @@ interface AppShellProps {
 }
 
 const HEADER_HIDDEN_ROUTES = ['/'];
-const PAGE_OWN_HEADER_PATTERN = /^\/match\/[^/]+\/score$/;
+const PAGE_OWN_HEADER_PATTERN = /^\/match\/[^/]+$/;
 
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();

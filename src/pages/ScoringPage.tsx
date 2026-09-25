@@ -712,7 +712,7 @@ export default function ScoringPage() {
       {/* ── Custom Header ──────────────────────────────────────── */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 h-12 flex items-center justify-between shrink-0">
         <button
-          onClick={() => navigate(`/match/${match.id}`)}
+          onClick={() => navigate(-1)}
           className="p-1 text-gray-400 hover:text-white transition-colors -ml-1"
         >
           <ArrowLeft className="w-5 h-5" />

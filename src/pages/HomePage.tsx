@@ -71,7 +71,7 @@ function LiveMatchCard({
       {canScore && (
         <div className="pt-2 border-t border-gray-700/60 flex gap-2">
           <Link
-            to={`/match/${match.id}/score`}
+            to={`/match/${match.id}`}
             className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded-lg text-xs transition-colors"
           >
             Resume Scoring <ArrowRight className="w-3.5 h-3.5" />

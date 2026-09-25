@@ -1,14 +1,12 @@
-import { useLocation, useParams } from 'react-router-dom';
-import { useMatchStore } from '@/stores/matchStore';
+import { useLocation } from 'react-router-dom';
 
 // Routes where the header should NOT be shown at all
 const HEADER_HIDDEN_ROUTES = ['/'];
-// Routes handled by the page itself (e.g., ScoringPage has its own header)
-const PAGE_OWN_HEADER_PATTERN = /^\/match\/[^/]+\/score$/;
+// Routes handled by the page itself (ScoringPage has its own header)
+const PAGE_OWN_HEADER_PATTERN = /^\/match\/[^/]+$/;
 
 function useHeaderTitle(): string | null {
   const location = useLocation();
-  const { match } = useMatchStore();
 
   const path = location.pathname;
 
@@ -19,12 +17,6 @@ function useHeaderTitle(): string | null {
   if (path === '/live') return 'Live Matches';
   if (path === '/history') return 'Match History';
   if (path === '/profile') return 'Profile';
-
-  // Match view: show "Team A vs Team B"
-  if (/^\/match\/[^/]+$/.test(path)) {
-    if (match) return `${match.team1.name} vs ${match.team2.name}`;
-    return 'Match';
-  }
 
   return 'InsideOut';
 }
