@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Drawer } from 'vaul';
 import { ArrowLeft, Share2, Undo2, UserMinus, ArrowLeftRight } from 'lucide-react';
 import { useMatchStore } from '@/stores/matchStore';
@@ -355,6 +355,7 @@ function OpeningPlayersModal({
 export default function ScoringPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { match, currentInnings, loading, error, subscribeToMatch, clear } = useMatchStore();
   const {
@@ -712,7 +713,13 @@ export default function ScoringPage() {
       {/* ── Custom Header ──────────────────────────────────────── */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 h-12 flex items-center justify-between shrink-0">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            if (location.state?.fromSetup) {
+              navigate('/');
+            } else {
+              navigate(-1);
+            }
+          }}
           className="p-1 text-gray-400 hover:text-white transition-colors -ml-1"
         >
           <ArrowLeft className="w-5 h-5" />

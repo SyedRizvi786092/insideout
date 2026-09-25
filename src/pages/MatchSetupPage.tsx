@@ -221,7 +221,7 @@ export default function MatchSetupPage() {
         console.warn('Could not save active match to localStorage:', e);
       }
 
-      navigate(`/match/${matchId}`);
+      navigate(`/match/${matchId}`, { replace: true, state: { fromSetup: true } });
     } catch (err) {
       console.error('Failed to start match:', err);
       setErrorMsg('Failed to create match. Please try again.');
