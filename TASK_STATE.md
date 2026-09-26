@@ -38,11 +38,11 @@ Phase 3 — bugs, redesigns, and architecture fixes complete. Build passes, 42 t
   - [x] Bug #1: Renamed "Players" label to "Players Per Side" in `MatchSetupPage.tsx`
   - [x] Bug #3: Added "Cancel" button in `MatchSetupPage.tsx`
   - [x] Bug #8: Renamed "Swap" button to "Swap Strike" in `ScoringPage.tsx`
-- [ ] **Batch 2**: Bug #5 (Player suggestions dismiss on click)
-- [ ] **Batch 3**: Bug #9 (Dismissal text formatting)
-- [ ] **Batch 4**: Bugs #7 + #10 (Undo multi-step & scorecard math restoration)
-- [ ] **Batch 5**: Bug #4 (Route consolidation)
-- [ ] **Batch 6**: Bugs #6 + #13 (Sticky action bar & universal wicket modal viewport architecture)
+- [x] **Batch 2**: Bug #5 (Player suggestions dismiss on click)
+- [x] **Batch 3**: Bug #9 (Dismissal text formatting)
+- [x] **Batch 4**: Bugs #7 + #10 (Undo multi-step & scorecard math restoration)
+- [x] **Batch 5**: Bug #4 (Route consolidation)
+- [x] **Batch 6**: Bugs #6 + #13 (Sticky action bar & universal wicket modal viewport architecture)
 - [ ] **Batch 7**: Bug #11 (Overs tab data refresh & dynamic team labels)
 - [ ] **Batch 8**: Bug #12 (Retired hurt player score preservation)
 - [ ] **Batch 9**: Bug #2 (Toss toggle switch)
