@@ -246,105 +246,118 @@ function OpeningPlayersModal({
 
   return (
     <div className="fixed inset-0 bg-gray-950/95 z-50 flex items-end justify-center">
-      <div className="bg-gray-900 rounded-t-2xl p-5 w-full max-w-lg max-h-[75dvh] overflow-y-auto">
-        <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
+      <div className="bg-gray-900 rounded-t-2xl w-full max-w-lg max-h-[92dvh] flex flex-col">
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-4">
-          {['Striker', 'Non-Striker', 'Bowler'].map((label, i) => {
-            const currentStepIndex = step === 'striker' ? 0 : step === 'nonStriker' ? 1 : 2;
-            return (
-              <div key={label} className="flex items-center gap-2 flex-1">
-                <div
-                  className={cn(
-                    'w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center',
-                    i < currentStepIndex
-                      ? 'bg-emerald-600 text-white'
-                      : i === currentStepIndex
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-gray-700 text-gray-400'
-                  )}
-                >
-                  {i < currentStepIndex ? '✓' : i + 1}
+        {/* ── TIER 1: Header (pinned, never scrolls) ── */}
+        <div className="shrink-0 px-5 pt-5 pb-2">
+          <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
+
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-4">
+            {['Striker', 'Non-Striker', 'Bowler'].map((label, i) => {
+              const currentStepIndex = step === 'striker' ? 0 : step === 'nonStriker' ? 1 : 2;
+              return (
+                <div key={label} className="flex items-center gap-2 flex-1">
+                  <div
+                    className={cn(
+                      'w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center',
+                      i < currentStepIndex
+                        ? 'bg-emerald-600 text-white'
+                        : i === currentStepIndex
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-gray-700 text-gray-400'
+                    )}
+                  >
+                    {i < currentStepIndex ? '✓' : i + 1}
+                  </div>
+                  <span
+                    className={cn(
+                      'text-xs',
+                      i === currentStepIndex ? 'text-white font-medium' : 'text-gray-500'
+                    )}
+                  >
+                    {label}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    'text-xs',
-                    i === currentStepIndex ? 'text-white font-medium' : 'text-gray-500'
-                  )}
-                >
-                  {label}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          <h2 className="text-lg font-bold text-white mb-1">
+            {step === 'striker' && 'Who is the Striker?'}
+            {step === 'nonStriker' && 'Who is the Non-Striker?'}
+            {step === 'bowler' && 'Who is the Opening Bowler?'}
+          </h2>
+          <p className="text-sm text-gray-400">
+            {step === 'bowler' ? `From ${bowlingTeamName}` : `From ${battingTeamName}`}
+          </p>
         </div>
 
-        <h2 className="text-lg font-bold text-white mb-1">
-          {step === 'striker' && 'Who is the Striker?'}
-          {step === 'nonStriker' && 'Who is the Non-Striker?'}
-          {step === 'bowler' && 'Who is the Opening Bowler?'}
-        </h2>
-        <p className="text-sm text-gray-400 mb-4">
-          {step === 'bowler' ? `From ${bowlingTeamName}` : `From ${battingTeamName}`}
-        </p>
-
-        {/* Already entered names */}
-        {step === 'nonStriker' && (
-          <div className="bg-gray-800/50 rounded-lg px-3 py-2 mb-3 text-sm">
-            <span className="text-gray-500">Striker: </span>
-            <span className="text-emerald-400 font-medium">{strikerName}</span>
-          </div>
-        )}
-        {step === 'bowler' && (
-          <div className="bg-gray-800/50 rounded-lg px-3 py-2 mb-3 text-sm space-y-1">
-            <div>
+        {/* ── TIER 2: Body (scrollable) ── */}
+        <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-2">
+          {/* Already entered names */}
+          {step === 'nonStriker' && (
+            <div className="bg-gray-800/50 rounded-lg px-3 py-2 mb-3 mt-2 text-sm">
               <span className="text-gray-500">Striker: </span>
               <span className="text-emerald-400 font-medium">{strikerName}</span>
             </div>
-            <div>
-              <span className="text-gray-500">Non-Striker: </span>
-              <span className="text-emerald-400 font-medium">{nonStrikerName}</span>
+          )}
+          {step === 'bowler' && (
+            <div className="bg-gray-800/50 rounded-lg px-3 py-2 mb-3 mt-2 text-sm space-y-1">
+              <div>
+                <span className="text-gray-500">Striker: </span>
+                <span className="text-emerald-400 font-medium">{strikerName}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Non-Striker: </span>
+                <span className="text-emerald-400 font-medium">{nonStrikerName}</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Input with autocomplete */}
-        <div className="mb-3">
-          <PlayerNameInput
-            value={currentName}
-            onChange={setCurrentName}
-            placeholder="Enter player name..."
-            dbPlayers={dbPlayers}
-            autoFocus
-          />
+          {/* Input with autocomplete */}
+          <div className="mb-2 mt-2">
+            <PlayerNameInput
+              value={currentName}
+              onChange={setCurrentName}
+              placeholder="Enter player name..."
+              dbPlayers={dbPlayers}
+              autoFocus
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-400 mb-2">{error}</p>
+          )}
         </div>
 
-        {error && (
-          <p className="text-sm text-red-400 mb-3">{error}</p>
-        )}
-
-        <button
-          onClick={handleConfirm}
-          onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
-          disabled={isSubmitting || !currentName.trim()}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl disabled:opacity-40 transition-colors"
+        {/* ── TIER 3: Footer (pinned, always visible above keyboard) ── */}
+        <div
+          className="shrink-0 px-5 pt-2 bg-gray-900"
+          style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
         >
-          {isSubmitting
-            ? 'Starting Match...'
-            : step === 'bowler'
-            ? 'Start Scoring'
-            : 'Next'}
-        </button>
-
-        {step !== 'striker' && !isSubmitting && (
           <button
-            onClick={() => setStep(step === 'bowler' ? 'nonStriker' : 'striker')}
-            className="w-full text-gray-400 hover:text-white text-sm mt-2 py-2"
+            onClick={handleConfirm}
+            onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
+            disabled={isSubmitting || !currentName.trim()}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl disabled:opacity-40 transition-colors"
           >
-            ← Back
+            {isSubmitting
+              ? 'Starting Match...'
+              : step === 'bowler'
+              ? 'Start Scoring'
+              : 'Next'}
           </button>
-        )}
+
+          {step !== 'striker' && !isSubmitting && (
+            <button
+              onClick={() => setStep(step === 'bowler' ? 'nonStriker' : 'striker')}
+              className="w-full text-gray-400 hover:text-white text-sm mt-2 py-2"
+            >
+              ← Back
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -699,7 +712,7 @@ export default function ScoringPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-dvh bg-gray-950 text-white overflow-hidden select-none">
+    <div className="flex flex-col h-dvh bg-gray-950 text-white overflow-hidden select-none pb-16">
 
       {/* ── Opening Players Modal ──────────────────────────────── */}
       <OpeningPlayersModal
@@ -752,7 +765,7 @@ export default function ScoringPage() {
 
       {/* ══════════════════ LIVE TAB ══════════════════════════════ */}
       {activeTab === 'live' && (
-        <>
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Status line */}
           {statusLine && (
             <div className="bg-gray-900 px-4 py-1.5 text-xs text-yellow-400 font-medium shrink-0">
@@ -959,48 +972,7 @@ export default function ScoringPage() {
               🔴 WICKET
             </button>
           </div>
-
-          {/* ── Sticky Action Bar ────────────────────────────────── */}
-          <div
-            className="bg-gray-900 border-t border-gray-800 flex items-center justify-around px-4 py-2 shrink-0"
-            style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
-          >
-            <button
-              onClick={() => isReady && undoDepth < 3 && match.lastBallId && undoLastBall(match.id, match)}
-              className={cn(
-                'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
-                isReady && undoDepth < 3 && match.lastBallId
-                  ? 'text-gray-400 hover:text-white'
-                  : 'text-gray-700 cursor-not-allowed'
-              )}
-            >
-              <Undo2 className="w-5 h-5" />
-              <span className="text-[10px]">
-                {undoDepth >= 3 ? 'Undo (3/3)' : 'Undo'}
-              </span>
-            </button>
-            <button
-              onClick={() => isReady && swapBatsmen(match.id, match)}
-              className={cn(
-                'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
-                isReady ? 'text-gray-400 hover:text-emerald-400' : 'text-gray-700'
-              )}
-            >
-              <ArrowLeftRight className="w-5 h-5" />
-              <span className="text-[10px]">Swap Strike</span>
-            </button>
-            <button
-              onClick={() => isReady && match.striker && retireHurt(match.id, match, match.striker.id)}
-              className={cn(
-                'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
-                isReady ? 'text-gray-400 hover:text-amber-400' : 'text-gray-700'
-              )}
-            >
-              <UserMinus className="w-5 h-5" />
-              <span className="text-[10px]">Retire Hurt</span>
-            </button>
-          </div>
-        </>
+        </div>
       )}
 
       {/* ══════════════════ SCORECARD TAB ════════════════════════ */}
@@ -1016,6 +988,45 @@ export default function ScoringPage() {
           <OversList matchId={matchId} match={match} />
         </div>
       )}
+
+
+      {/* ── Action Bar (always visible, all tabs) ────────────────── */}
+      <div className="bg-gray-900 border-t border-gray-800 flex items-center justify-around px-4 py-2 shrink-0">
+        <button
+          onClick={() => isReady && undoDepth < 3 && match.lastBallId && undoLastBall(match.id, match)}
+          className={cn(
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
+            isReady && undoDepth < 3 && match.lastBallId
+              ? 'text-gray-400 hover:text-white'
+              : 'text-gray-700 cursor-not-allowed'
+          )}
+        >
+          <Undo2 className="w-5 h-5" />
+          <span className="text-[10px]">
+            {undoDepth >= 3 ? 'Undo (3/3)' : 'Undo'}
+          </span>
+        </button>
+        <button
+          onClick={() => isReady && swapBatsmen(match.id, match)}
+          className={cn(
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
+            isReady ? 'text-gray-400 hover:text-emerald-400' : 'text-gray-700'
+          )}
+        >
+          <ArrowLeftRight className="w-5 h-5" />
+          <span className="text-[10px]">Swap Strike</span>
+        </button>
+        <button
+          onClick={() => isReady && match.striker && retireHurt(match.id, match, match.striker.id)}
+          className={cn(
+            'flex flex-col items-center gap-0.5 py-1 px-3 transition-colors',
+            isReady ? 'text-gray-400 hover:text-amber-400' : 'text-gray-700'
+          )}
+        >
+          <UserMinus className="w-5 h-5" />
+          <span className="text-[10px]">Retire Hurt</span>
+        </button>
+      </div>
 
       {/* ══════════════════ MODALS ══════════════════════════════ */}
 
@@ -1047,140 +1058,153 @@ export default function ScoringPage() {
       <Drawer.Root open={showWicketModal} onOpenChange={(open) => !open && toggleWicketModal()}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-black/70 z-40" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 bg-gray-900 rounded-t-2xl p-5 z-50 max-h-[85dvh] overflow-y-auto">
-            <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
-            <Drawer.Title className="text-lg font-bold mb-4">How was the batter out?</Drawer.Title>
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 bg-gray-900 rounded-t-2xl z-50 flex flex-col max-h-[92dvh]">
 
-            {/* Dismissal type chips */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {Object.values(WicketType).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setWicketType(t);
-                    // Reset batsmanOutId to striker for non-RunOut
-                    if (t !== WicketType.RunOut && match.striker) {
-                      setBatsmanOutId(match.striker.id);
-                    }
-                  }}
-                  className={cn(
-                    'px-4 py-2 rounded-full text-sm font-medium capitalize transition-colors',
-                    wicketType === t ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  )}
-                >
-                  {t.replace('_', ' ')}
-                </button>
-              ))}
+            {/* ── TIER 1: Header (pinned) ── */}
+            <div className="shrink-0 px-5 pt-5 pb-2">
+              <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
+              <Drawer.Title className="text-lg font-bold mb-3">How was the batter out?</Drawer.Title>
             </div>
 
-            {/* "Who is out?" — only for Run Out */}
-            {wicketType === WicketType.RunOut && (
-              <div className="mb-4">
-                <p className="text-sm text-gray-400 mb-2">Who is out?</p>
-                <div className="flex gap-2">
-                  {match.striker && (
-                    <button
-                      onClick={() => setBatsmanOutId(match.striker!.id)}
-                      className={cn(
-                        'flex-1 p-3 rounded-xl border text-center transition-colors',
-                        batsmanOutId === match.striker.id
-                          ? 'border-red-500 bg-red-500/20 text-white'
-                          : 'border-gray-700 bg-gray-800 text-gray-300'
-                      )}
-                    >
-                      <p className="font-semibold text-sm">{match.striker.name}</p>
-                      <p className="text-xs text-gray-400">Striker</p>
-                    </button>
-                  )}
-                  {match.nonStriker && (
-                    <button
-                      onClick={() => setBatsmanOutId(match.nonStriker!.id)}
-                      className={cn(
-                        'flex-1 p-3 rounded-xl border text-center transition-colors',
-                        batsmanOutId === match.nonStriker.id
-                          ? 'border-red-500 bg-red-500/20 text-white'
-                          : 'border-gray-700 bg-gray-800 text-gray-300'
-                      )}
-                    >
-                      <p className="font-semibold text-sm">{match.nonStriker.name}</p>
-                      <p className="text-xs text-gray-400">Non-striker</p>
-                    </button>
-                  )}
-                </div>
+            {/* ── TIER 2: Body (scrollable) ── */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-2">
+              {/* Dismissal type chips */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {Object.values(WicketType).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setWicketType(t);
+                      // Reset batsmanOutId to striker for non-RunOut
+                      if (t !== WicketType.RunOut && match.striker) {
+                        setBatsmanOutId(match.striker.id);
+                      }
+                    }}
+                    className={cn(
+                      'px-4 py-2 rounded-full text-sm font-medium capitalize transition-colors',
+                      wicketType === t ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    )}
+                  >
+                    {t.replace('_', ' ')}
+                  </button>
+                ))}
               </div>
-            )}
 
-            {/* Run Out: end + runs before */}
-            {wicketType === WicketType.RunOut && (
-              <>
-                <div className="mb-4">
-                  <p className="text-sm text-gray-400 mb-2">Run out end</p>
+              {/* "Who is out?" — only for Run Out */}
+              {wicketType === WicketType.RunOut && (
+                <div className="mb-3">
+                  <p className="text-sm text-gray-400 mb-2">Who is out?</p>
                   <div className="flex gap-2">
-                    {(['batting', 'bowling'] as const).map((end) => (
+                    {match.striker && (
                       <button
-                        key={end}
-                        onClick={() => setRunOutEnd(end)}
+                        onClick={() => setBatsmanOutId(match.striker!.id)}
                         className={cn(
-                          'flex-1 py-2.5 rounded-xl border text-sm font-medium capitalize transition-colors',
-                          runOutEnd === end
-                            ? 'border-orange-500 bg-orange-500/20 text-orange-300'
+                          'flex-1 p-3 rounded-xl border text-center transition-colors',
+                          batsmanOutId === match.striker.id
+                            ? 'border-red-500 bg-red-500/20 text-white'
                             : 'border-gray-700 bg-gray-800 text-gray-300'
                         )}
                       >
-                        {end === 'batting' ? 'Batting end' : 'Bowling end'}
+                        <p className="font-semibold text-sm">{match.striker.name}</p>
+                        <p className="text-xs text-gray-400">Striker</p>
                       </button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gray-600 mt-1">
-                    {runOutEnd === 'batting'
-                      ? 'New batsman takes the strike'
-                      : 'New batsman is non-striker'}
-                  </p>
-                </div>
-                <div className="mb-4">
-                  <p className="text-sm text-gray-400 mb-2">Runs completed before run out</p>
-                  <div className="flex gap-2">
-                    {[0, 1, 2, 3].map((r) => (
+                    )}
+                    {match.nonStriker && (
                       <button
-                        key={r}
-                        onClick={() => setRunsBefore(r)}
+                        onClick={() => setBatsmanOutId(match.nonStriker!.id)}
                         className={cn(
-                          'flex-1 py-2 rounded-xl border text-sm font-bold transition-colors',
-                          runsBefore === r
-                            ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                          'flex-1 p-3 rounded-xl border text-center transition-colors',
+                          batsmanOutId === match.nonStriker.id
+                            ? 'border-red-500 bg-red-500/20 text-white'
                             : 'border-gray-700 bg-gray-800 text-gray-300'
                         )}
                       >
-                        {r}
+                        <p className="font-semibold text-sm">{match.nonStriker.name}</p>
+                        <p className="text-xs text-gray-400">Non-striker</p>
                       </button>
-                    ))}
+                    )}
                   </div>
                 </div>
-              </>
-            )}
+              )}
 
-            {/* Fielder name — for Caught, RunOut, Stumped */}
-            {[WicketType.Caught, WicketType.RunOut, WicketType.Stumped].includes(wicketType) && (
-              <div className="mb-4">
-                <label className="text-sm text-gray-400 block mb-1">
-                  {wicketType === WicketType.Caught ? 'Caught by' : wicketType === WicketType.Stumped ? 'Stumped by' : 'Run out by'}
-                </label>
-                <PlayerNameInput
-                  value={fielderName}
-                  onChange={setFielderName}
-                  placeholder="Enter fielder's name"
-                  dbPlayers={dbPlayers}
-                />
-              </div>
-            )}
+              {/* Run Out: end + runs before */}
+              {wicketType === WicketType.RunOut && (
+                <>
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-400 mb-2">Run out end</p>
+                    <div className="flex gap-2">
+                      {(['batting', 'bowling'] as const).map((end) => (
+                        <button
+                          key={end}
+                          onClick={() => setRunOutEnd(end)}
+                          className={cn(
+                            'flex-1 py-2.5 rounded-xl border text-sm font-medium capitalize transition-colors',
+                            runOutEnd === end
+                              ? 'border-orange-500 bg-orange-500/20 text-orange-300'
+                              : 'border-gray-700 bg-gray-800 text-gray-300'
+                          )}
+                        >
+                          {end === 'batting' ? 'Batting end' : 'Bowling end'}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      {runOutEnd === 'batting'
+                        ? 'New batsman takes the strike'
+                        : 'New batsman is non-striker'}
+                    </p>
+                  </div>
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-400 mb-2">Runs completed before run out</p>
+                    <div className="flex gap-2">
+                      {[0, 1, 2, 3].map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => setRunsBefore(r)}
+                          className={cn(
+                            'flex-1 py-2 rounded-xl border text-sm font-bold transition-colors',
+                            runsBefore === r
+                              ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                              : 'border-gray-700 bg-gray-800 text-gray-300'
+                          )}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
-            <button
-              onClick={submitWicket}
-              disabled={wicketType === WicketType.RunOut && !batsmanOutId}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl disabled:opacity-40"
+              {/* Fielder name — for Caught, RunOut, Stumped */}
+              {[WicketType.Caught, WicketType.RunOut, WicketType.Stumped].includes(wicketType) && (
+                <div className="mb-2">
+                  <label className="text-sm text-gray-400 block mb-1">
+                    {wicketType === WicketType.Caught ? 'Caught by' : wicketType === WicketType.Stumped ? 'Stumped by' : 'Run out by'}
+                  </label>
+                  <PlayerNameInput
+                    value={fielderName}
+                    onChange={setFielderName}
+                    placeholder="Enter fielder's name"
+                    dbPlayers={dbPlayers}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── TIER 3: Footer (pinned — never scrolls, always above keyboard) ── */}
+            <div
+              className="shrink-0 px-5 pt-2 bg-gray-900"
+              style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
             >
-              Confirm Wicket
-            </button>
+              <button
+                onClick={submitWicket}
+                disabled={wicketType === WicketType.RunOut && !batsmanOutId}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl disabled:opacity-40"
+              >
+                Confirm Wicket
+              </button>
+            </div>
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
@@ -1189,43 +1213,58 @@ export default function ScoringPage() {
       <Drawer.Root open={showNewBatsmanModal} onOpenChange={(open) => !open && toggleNewBatsmanModal()}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-black/70 z-40" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 bg-gray-900 rounded-t-2xl p-5 z-50">
-            <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
-            <Drawer.Title className="text-lg font-bold mb-4">New Batsman</Drawer.Title>
-            <div className="mb-3">
-              <PlayerNameInput
-                value={newPlayerName}
-                onChange={setNewPlayerName}
-                placeholder="Enter batsman's name..."
-                dbPlayers={dbPlayers}
-                autoFocus
-              />
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 bg-gray-900 rounded-t-2xl z-50 flex flex-col max-h-[92dvh]">
+
+            {/* ── TIER 1: Header (pinned) ── */}
+            <div className="shrink-0 px-5 pt-5 pb-2">
+              <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
+              <Drawer.Title className="text-lg font-bold mb-3">New Batsman</Drawer.Title>
             </div>
-            {match.retiredBatsmen && match.retiredBatsmen.length > 0 && (
+
+            {/* ── TIER 2: Body (scrollable) ── */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-2">
               <div className="mb-3">
-                <p className="text-xs text-gray-500 mb-2">Retired players:</p>
-                {match.retiredBatsmen.map((id) => {
-                  const card = currentInnings.battingCard.find((b: any) => b.playerId === id);
-                  if (!card) return null;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => setNewPlayerName(card.playerName)}
-                      className="w-full text-left bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-2.5 text-amber-200 text-sm mb-1.5 hover:bg-amber-900/40"
-                    >
-                      {card.playerName} <span className="text-amber-400">({card.runs} runs)</span>
-                    </button>
-                  );
-                })}
+                <PlayerNameInput
+                  value={newPlayerName}
+                  onChange={setNewPlayerName}
+                  placeholder="Enter batsman's name..."
+                  dbPlayers={dbPlayers}
+                  autoFocus
+                />
               </div>
-            )}
-            <button
-              onClick={confirmNewBatsman}
-              disabled={!newPlayerName.trim()}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl disabled:opacity-40"
+              {match.retiredBatsmen && match.retiredBatsmen.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-2">Retired players:</p>
+                  {match.retiredBatsmen.map((id) => {
+                    const card = currentInnings.battingCard.find((b: any) => b.playerId === id);
+                    if (!card) return null;
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => setNewPlayerName(card.playerName)}
+                        className="w-full text-left bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-2.5 text-amber-200 text-sm mb-1.5 hover:bg-amber-900/40"
+                      >
+                        {card.playerName} <span className="text-amber-400">({card.runs} runs)</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── TIER 3: Footer (pinned) ── */}
+            <div
+              className="shrink-0 px-5 pt-2 bg-gray-900"
+              style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
             >
-              Confirm Batsman
-            </button>
+              <button
+                onClick={confirmNewBatsman}
+                disabled={!newPlayerName.trim()}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl disabled:opacity-40"
+              >
+                Confirm Batsman
+              </button>
+            </div>
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
@@ -1234,49 +1273,64 @@ export default function ScoringPage() {
       <Drawer.Root open={showNewBowlerModal} onOpenChange={(open) => !open && toggleNewBowlerModal()}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-black/70 z-40" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 bg-gray-900 rounded-t-2xl p-5 z-50">
-            <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
-            <Drawer.Title className="text-lg font-bold mb-4">New Bowler</Drawer.Title>
-            {currentInnings.bowlingCard.length > 0 && (
-              <div className="mb-3">
-                <p className="text-xs text-gray-500 mb-2">Previous bowlers:</p>
-                {currentInnings.bowlingCard.map((b: any) => {
-                  const isLast = match.currentBowler?.id === b.playerId;
-                  return (
-                    <button
-                      key={b.playerId}
-                      disabled={isLast}
-                      onClick={() => setNewBowlerName(b.playerName)}
-                      className={cn(
-                        'w-full text-left rounded-lg px-4 py-2.5 text-sm mb-1.5 flex justify-between',
-                        isLast ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed' : 'bg-gray-800 text-white hover:bg-gray-700'
-                      )}
-                    >
-                      <span>{b.playerName}</span>
-                      <span className="text-gray-500 font-mono text-xs">
-                        {oversToString(b.overs)}-{b.maidens}-{b.runsConceded}-{b.wickets}
-                        {isLast && <span className="ml-2 text-gray-600">(last)</span>}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <div className="mb-3">
-              <PlayerNameInput
-                value={newBowlerName}
-                onChange={setNewBowlerName}
-                placeholder="Enter bowler's name..."
-                dbPlayers={dbPlayers}
-              />
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 bg-gray-900 rounded-t-2xl z-50 flex flex-col max-h-[92dvh]">
+
+            {/* ── TIER 1: Header (pinned) ── */}
+            <div className="shrink-0 px-5 pt-5 pb-2">
+              <div className="mx-auto w-12 h-1 rounded-full bg-gray-700 mb-4" />
+              <Drawer.Title className="text-lg font-bold mb-3">New Bowler</Drawer.Title>
             </div>
-            <button
-              onClick={confirmNewBowler}
-              disabled={!newBowlerName.trim()}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl disabled:opacity-40"
+
+            {/* ── TIER 2: Body (scrollable) ── */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-2">
+              {currentInnings.bowlingCard.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs text-gray-500 mb-2">Previous bowlers:</p>
+                  {currentInnings.bowlingCard.map((b: any) => {
+                    const isLast = match.currentBowler?.id === b.playerId;
+                    return (
+                      <button
+                        key={b.playerId}
+                        disabled={isLast}
+                        onClick={() => setNewBowlerName(b.playerName)}
+                        className={cn(
+                          'w-full text-left rounded-lg px-4 py-2.5 text-sm mb-1.5 flex justify-between',
+                          isLast ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed' : 'bg-gray-800 text-white hover:bg-gray-700'
+                        )}
+                      >
+                        <span>{b.playerName}</span>
+                        <span className="text-gray-500 font-mono text-xs">
+                          {oversToString(b.overs)}-{b.maidens}-{b.runsConceded}-{b.wickets}
+                          {isLast && <span className="ml-2 text-gray-600">(last)</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="mb-2">
+                <PlayerNameInput
+                  value={newBowlerName}
+                  onChange={setNewBowlerName}
+                  placeholder="Enter bowler's name..."
+                  dbPlayers={dbPlayers}
+                />
+              </div>
+            </div>
+
+            {/* ── TIER 3: Footer (pinned) ── */}
+            <div
+              className="shrink-0 px-5 pt-2 bg-gray-900"
+              style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
             >
-              Confirm Bowler
-            </button>
+              <button
+                onClick={confirmNewBowler}
+                disabled={!newBowlerName.trim()}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl disabled:opacity-40"
+              >
+                Confirm Bowler
+              </button>
+            </div>
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
