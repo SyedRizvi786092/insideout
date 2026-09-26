@@ -89,8 +89,11 @@ export default function MatchSetupPage() {
   // ── Form State ──────────────────────────────────────────────────────────────
   const [team1Name, setTeam1Name] = useState('Team A');
   const [team2Name, setTeam2Name] = useState('Team B');
-  const [overs, setOvers] = useState(10);
-  const [playersPerSide, setPlayersPerSide] = useState(6);
+  const [oversRaw, setOversRaw] = useState('10');
+  const [playersRaw, setPlayersRaw] = useState('6');
+
+  const overs = parseInt(oversRaw);
+  const playersPerSide = parseInt(playersRaw);
 
   const [extras, setExtras] = useState<ExtrasConfig>(DEFAULT_EXTRAS_CONFIG);
 
@@ -149,17 +152,6 @@ export default function MatchSetupPage() {
     }
   };
 
-  const handleOversChange = (val: string) => {
-    const n = parseInt(val);
-    if (isNaN(n)) return;
-    setOvers(Math.max(1, Math.min(20, n)));
-  };
-
-  const handlePlayersChange = (val: string) => {
-    const n = parseInt(val);
-    if (isNaN(n)) return;
-    setPlayersPerSide(Math.max(2, Math.min(16, n)));
-  };
 
   // ── Start Match ─────────────────────────────────────────────────────────────
   const handleStartMatch = async () => {
@@ -229,7 +221,7 @@ export default function MatchSetupPage() {
         console.warn('Could not save active match to localStorage:', e);
       }
 
-      navigate(`/match/${matchId}/score`);
+      navigate(`/match/${matchId}`, { replace: true, state: { fromSetup: true } });
     } catch (err) {
       console.error('Failed to start match:', err);
       setErrorMsg('Failed to create match. Please try again.');
@@ -278,15 +270,14 @@ export default function MatchSetupPage() {
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Match Setup</h2>
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-sm text-gray-400 mb-1">
-                Overs <span className="text-gray-600">(1–20)</span>
-              </label>
+              <label className="block text-sm text-gray-400 mb-1">Overs</label>
               <input
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={20}
-                value={overs}
-                onChange={(e) => handleOversChange(e.target.value)}
+                value={oversRaw}
+                onChange={(e) => setOversRaw(e.target.value)}
                 className={cn(
                   'w-full bg-gray-800 border rounded-lg px-3 py-2.5 text-white focus:outline-none',
                   isOversValid ? 'border-gray-700 focus:border-emerald-500' : 'border-red-500'
@@ -295,15 +286,14 @@ export default function MatchSetupPage() {
               {!isOversValid && <p className="text-xs text-red-400 mt-1">Must be 1–20</p>}
             </div>
             <div className="flex-1">
-              <label className="block text-sm text-gray-400 mb-1">
-                Players <span className="text-gray-600">(2–16)</span>
-              </label>
+              <label className="block text-sm text-gray-400 mb-1">Players Per Side</label>
               <input
                 type="number"
+                inputMode="numeric"
                 min={2}
                 max={16}
-                value={playersPerSide}
-                onChange={(e) => handlePlayersChange(e.target.value)}
+                value={playersRaw}
+                onChange={(e) => setPlayersRaw(e.target.value)}
                 className={cn(
                   'w-full bg-gray-800 border rounded-lg px-3 py-2.5 text-white focus:outline-none',
                   isPlayersValid ? 'border-gray-700 focus:border-emerald-500' : 'border-red-500'
@@ -323,11 +313,10 @@ export default function MatchSetupPage() {
           <Toggle checked={extras.legByesEnabled} onChange={(v) => updateExtra('legByesEnabled', v)} label="Leg Byes" />
         </section>
 
-        {/* ── Toss / Batting First ───────────────────────────────── */}
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Batting Order</h2>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Toss</h2>
 
-          {/* Toggle: Toss or Direct */}
+          {/* Toggle: Skip Toss or Enter Toss Result */}
           <div className="flex gap-2 mb-4">
             <button
               type="button"
@@ -337,7 +326,7 @@ export default function MatchSetupPage() {
                 skipToss ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400' : 'bg-gray-800 border-gray-700 text-gray-300'
               )}
             >
-              Choose Directly
+              Skip Toss
             </button>
             <button
               type="button"
@@ -347,7 +336,7 @@ export default function MatchSetupPage() {
                 !skipToss ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400' : 'bg-gray-800 border-gray-700 text-gray-300'
               )}
             >
-              Toss
+              Enter Toss Result
             </button>
           </div>
 
@@ -519,6 +508,14 @@ export default function MatchSetupPage() {
           )}
         >
           {isStarting ? 'Creating Match...' : 'Start Match'}
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          disabled={isStarting}
+          className="w-full mt-3 py-3 rounded-xl border border-gray-700 bg-gray-800/80 hover:bg-gray-800 text-gray-300 hover:text-white font-medium text-base transition-colors"
+        >
+          Cancel
         </button>
         {!canStart && !isStarting && (
           <p className="text-center text-xs text-gray-500 mt-2">

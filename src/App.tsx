@@ -4,7 +4,6 @@ import AppShell from '@/components/layout/AppShell';
 import PageContainer from '@/components/layout/PageContainer';
 import HomePage from '@/pages/HomePage';
 import MatchSetupPage from '@/pages/MatchSetupPage';
-import MatchViewPage from '@/pages/MatchViewPage';
 import ScoringPage from '@/pages/ScoringPage';
 import LivePage from '@/pages/LivePage';
 import { useAuthStore } from '@/stores/authStore';
@@ -44,8 +43,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/match/new" element={<MatchSetupPage />} />
-          <Route path="/match/:matchId" element={<MatchViewPage />} />
-          <Route path="/match/:matchId/score" element={<ScoringPage />} />
+          <Route path="/match/:matchId" element={<ScoringPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/live" element={<LivePage />} />
